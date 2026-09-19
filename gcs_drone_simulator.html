@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GCS // Controller Test Rig</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-void:#070a09;
+    --bg-panel:#0d1310;
+    --bg-panel-2:#121a15;
+    --line:#1c2921;
+    --phosphor:#6dffa0;
+    --phosphor-dim:#2f6b48;
+    --amber:#ffb454;
+    --cyan:#6fd8ff;
+    --danger:#ff5f56;
+    --text:#d9f5e3;
+    --text-dim:#628070;
+    --font-mono:'IBM Plex Mono', 'Courier New', monospace;
+    --font-sans:'IBM Plex Sans', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;background:var(--bg-void);color:var(--text);font-family:var(--font-sans);overflow:hidden;}
+  #app{display:flex;flex-direction:column;height:100%;}
+
+  /* ---------- top bar ---------- */
+  #topbar{
+    display:flex;align-items:center;gap:14px;flex-wrap:wrap;row-gap:8px;
+    padding:10px 16px;background:var(--bg-panel);
+    border-bottom:1px solid var(--line);
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.04em;
+    flex-shrink:0;
+  }
+  .brand{font-weight:700;color:var(--phosphor);letter-spacing:.12em;font-size:13px;}
+  .brand small{display:block;color:var(--text-dim);font-weight:400;font-size:10px;letter-spacing:.08em;margin-top:1px;}
+  .spacer{flex:1;min-width:8px;}
+  .led{width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 6px var(--danger);flex-shrink:0;}
+  .led.on{background:var(--phosphor);box-shadow:0 0 8px var(--phosphor);}
+  .led.demo{background:var(--amber);box-shadow:0 0 8px var(--amber);}
+  .statustext{color:var(--text-dim);min-width:110px;}
+  button{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.05em;
+    background:var(--bg-panel-2);color:var(--text);border:1px solid var(--line);
+    padding:7px 12px;border-radius:3px;cursor:pointer;transition:border-color .15s,color .15s;
+  }
+  button:hover{border-color:var(--phosphor-dim);color:var(--phosphor);}
+  button.primary{border-color:var(--phosphor-dim);color:var(--phosphor);}
+  button.primary:hover{background:var(--phosphor);color:#04120a;}
+  button:disabled{opacity:.35;cursor:default;}
+  button:disabled:hover{border-color:var(--line);color:var(--text);}
+  .rate{color:var(--cyan);min-width:70px;text-align:right;}
+
+  /* ---------- main viewport ---------- */
+  #main{position:relative;flex:1;min-height:0;}
+  #canvas-wrap{position:absolute;inset:0;}
+  canvas{display:block;width:100%;height:100%;}
+
+  #hud{position:absolute;inset:0;pointer-events:none;}
+  .panel{
+    position:absolute;background:rgba(13,19,16,.86);border:1px solid var(--line);
+    border-radius:6px;padding:11px 13px;font-family:var(--font-mono);
+    backdrop-filter:blur(3px);box-shadow:0 4px 18px rgba(0,0,0,.35);
+  }
+  #telemetry-left{top:14px;left:14px;width:156px;}
+  #telemetry-right{top:14px;right:14px;width:156px;}
+  .tele-row{margin-bottom:10px;}
+  .tele-row:last-child{margin-bottom:0;}
+  .tele-label{font-size:9px;color:var(--text-dim);letter-spacing:.1em;margin-bottom:3px;display:flex;justify-content:space-between;}
+  .tele-label .tele-unit{color:var(--text-dim);opacity:.7;}
+  .tele-val{font-size:16px;color:var(--phosphor);font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.01em;}
+  .bar-track{height:4px;background:var(--bg-panel-2);border-radius:2px;margin-top:6px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--phosphor);width:50%;transition:width .08s ease-out;box-shadow:0 0 6px rgba(109,255,160,.5);}
+  .tele-divider{height:1px;background:var(--line);margin:10px 0;}
+
+  #radar{position:absolute;bottom:14px;right:14px;width:132px;height:132px;border-radius:50%;
+    background:radial-gradient(circle, rgba(20,30,24,.85) 0%, rgba(13,19,16,.9) 100%);
+    border:1px solid var(--line);box-shadow:0 4px 18px rgba(0,0,0,.35);}
+
+  #legend-toggle,#log-toggle{pointer-events:auto;}
+
+  #btnbar{position:absolute;bottom:14px;left:14px;display:flex;gap:6px;}
+  .flag{
+    width:26px;height:20px;display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-mono);font-size:9px;border:1px solid var(--line);border-radius:3px;
+    color:var(--text-dim);background:var(--bg-panel-2);transition:background .12s,border-color .12s,color .12s;
+  }
+  .flag.active{color:#04120a;background:var(--amber);border-color:var(--amber);}
+
+  /* ---------- flight control (in topbar, next to CONNECT/DEMO) ---------- */
+  .topbar-divider{width:1px;height:20px;background:var(--line);flex-shrink:0;}
+  .flight-state{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:var(--text-dim);min-width:64px;text-align:center;flex-shrink:0;}
+  .flight-state.running{color:var(--phosphor);}
+  #btnStart, #btnStop{padding:7px 14px;font-weight:600;}
+  #btnStart{border-color:var(--phosphor-dim);color:var(--phosphor);}
+  #btnStart:hover:not(:disabled){background:var(--phosphor);color:#04120a;}
+  #btnStop{border-color:#5a2422;color:var(--danger);}
+  #btnStop:hover:not(:disabled){background:var(--danger);color:#1a0605;}
+
+  /* ---------- mission panel ---------- */
+  #missionpanel{
+    position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+    width:min(640px, 62vw);min-width:300px;max-width:calc(100vw - 340px);pointer-events:auto;
+  }
+  #missionpanel .panel-head{
+    display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;
+  }
+  #missionpanel .panel-title{font-size:10px;letter-spacing:.1em;color:var(--text-dim);}
+  #missionList{display:flex;flex-direction:column;gap:6px;max-height:168px;overflow-y:auto;}
+  .mission-item{
+    display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:4px;
+    background:var(--bg-panel-2);border:1px solid var(--line);cursor:pointer;
+    transition:border-color .12s;
+  }
+  .mission-item:hover{border-color:var(--phosphor-dim);}
+  .mission-item.active{border-color:var(--phosphor-dim);background:#152018;}
+  .mission-idx{font-size:10px;color:var(--text-dim);width:16px;flex-shrink:0;}
+  .mission-info{flex:1;min-width:0;}
+  .mission-name{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .mission-desc{font-size:10.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px;}
+  .mission-badge{
+    flex-shrink:0;font-size:10px;letter-spacing:.05em;padding:4px 9px;border-radius:3px;
+    border:1px solid var(--line);color:var(--text-dim);white-space:nowrap;
+  }
+  .mission-badge.progress{color:var(--amber);border-color:#5a4322;}
+  .mission-badge.done{color:var(--phosphor);border-color:var(--phosphor-dim);}
+
+  @media (max-width: 860px){
+    #missionpanel{max-width:calc(100vw - 28px);width:min(640px, 90vw);}
+  }
+
+  #center-empty{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;pointer-events:auto;text-align:center;
+  }
+  #center-empty h2{font-family:var(--font-mono);font-weight:600;font-size:15px;color:var(--phosphor);letter-spacing:.06em;margin:0;}
+  #center-empty p{max-width:380px;color:var(--text-dim);font-size:12.5px;line-height:1.6;margin:0;}
+  #center-empty .actions{display:flex;gap:10px;margin-top:4px;}
+  #center-empty code{color:var(--cyan);background:var(--bg-panel-2);padding:1px 5px;border-radius:3px;}
+
+  /* ---------- bottom log ---------- */
+  #logpanel{
+    flex-shrink:0;background:var(--bg-panel);border-top:1px solid var(--line);
+    font-family:var(--font-mono);font-size:11px;color:var(--text-dim);
+    max-height:0;overflow:hidden;transition:max-height .18s ease;
+  }
+  #logpanel.open{max-height:150px;}
+  #loginner{padding:8px 16px;overflow-y:auto;max-height:150px;}
+  #loginner div{white-space:pre;line-height:1.6;}
+  #loginner div:last-child{color:var(--phosphor);}
+
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+
+  /* ---------- view toggle button ---------- */
+  #btnView{min-width:104px;}
+
+  /* ---------- FPV crosshair overlay ---------- */
+  #fpvOverlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;}
+  #fpvOverlay.show{display:flex;}
+  #fpvOverlay .cross{position:relative;width:28px;height:28px;}
+  #fpvOverlay .cross::before,#fpvOverlay .cross::after{content:'';position:absolute;background:rgba(109,255,160,.75);}
+  #fpvOverlay .cross::before{left:0;right:0;top:50%;height:2px;transform:translateY(-1px);}
+  #fpvOverlay .cross::after{top:0;bottom:0;left:50%;width:2px;transform:translateX(-1px);}
+  #fpvOverlay .fpv-tag{position:absolute;top:calc(50% + 20px);left:50%;transform:translateX(-50%);
+    font-family:var(--font-mono);font-size:9px;letter-spacing:.1em;color:var(--phosphor);opacity:.7;}
+
+  /* ---------- collision flash ---------- */
+  #main.collision-flash{animation:flashRed .35s ease;}
+  @keyframes flashRed{
+    0%{box-shadow:inset 0 0 0 8px rgba(255,95,86,.6);}
+    100%{box-shadow:inset 0 0 0 8px rgba(255,95,86,0);}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="topbar">
+    <div class="brand">GCS · CONTROLLER TEST RIG<small>NRF24 TX bench · attitude preview</small></div>
+    <div class="spacer"></div>
+    <div class="rate" id="rateDisplay">-- Hz</div>
+    <div class="led" id="statusLed"></div>
+    <div class="statustext" id="statusText">DISCONNECTED</div>
+    <div class="statustext" id="armedText">DISARMED</div>
+    <button class="primary" id="btnConnect">CONNECT USB</button>
+    <button id="btnDemo">DEMO MODE</button>
+    <div class="topbar-divider"></div>
+    <div class="flight-state" id="flightState">STOPPED</div>
+    <button class="primary" id="btnStart">START</button>
+    <button id="btnStop" disabled>STOP</button>
+    <div class="topbar-divider"></div>
+    <button id="btnView">VIEW: CHASE</button>
+    <button id="btnLog">LOG</button>
+  </div>
+
+  <div id="main">
+    <div id="canvas-wrap"></div>
+
+    <div id="hud">
+      <div class="panel" id="telemetry-left">
+        <div class="tele-row"><div class="tele-label">THROTTLE</div><div class="tele-val" id="valThr">0000</div><div class="bar-track"><div class="bar-fill" id="barThr"></div></div></div>
+        <div class="tele-row"><div class="tele-label">YAW</div><div class="tele-val" id="valYaw">0000</div><div class="bar-track"><div class="bar-fill" id="barYaw"></div></div></div>
+        <div class="tele-divider"></div>
+        <div class="tele-row"><div class="tele-label">ALTITUDE<span class="tele-unit">m</span></div><div class="tele-val" id="valAlt">0.0</div></div>
+        <div class="tele-row"><div class="tele-label">SPEED<span class="tele-unit">m/s</span></div><div class="tele-val" id="valSpeed">0.0</div></div>
+        <div class="tele-row"><div class="tele-label">HITS</div><div class="tele-val" id="valHits">0</div></div>
+      </div>
+
+      <div id="fpvOverlay"><div class="cross"></div><div class="fpv-tag">FPV</div></div>
+      <div class="panel" id="telemetry-right">
+        <div class="tele-row"><div class="tele-label">PITCH</div><div class="tele-val" id="valPitch">0000</div><div class="bar-track"><div class="bar-fill" id="barPitch"></div></div></div>
+        <div class="tele-row"><div class="tele-label">ROLL</div><div class="tele-val" id="valRoll">0000</div><div class="bar-track"><div class="bar-fill" id="barRoll"></div></div></div>
+        <div class="tele-divider"></div>
+        <div class="tele-row"><div class="tele-label">LIFT<span class="tele-unit">N</span></div><div class="tele-val" id="valLift">0.0</div></div>
+        <div class="tele-row"><div class="tele-label">WEIGHT<span class="tele-unit">N</span></div><div class="tele-val" id="valWeight">0.0</div></div>
+        <div class="tele-divider"></div>
+        <div class="tele-row"><div class="tele-label">HDG<span class="tele-unit">deg</span></div><div class="tele-val" id="valHdg">000</div></div>
+        <div class="tele-row"><div class="tele-label">G-FORCE</div><div class="tele-val" id="valG">1.00g</div></div>
+      </div>
+
+      <canvas id="radar" width="132" height="132"></canvas>
+
+      <div id="btnbar"></div>
+
+      <div id="missionpanel" class="panel">
+        <div class="panel-head">
+          <div class="panel-title">MISSIONS</div>
+          <div class="panel-title" id="missionStatus">—</div>
+        </div>
+        <div id="missionList"></div>
+      </div>
+
+      <div id="center-empty">
+        <h2>KHÔNG CÓ DỮ LIỆU ĐẦU VÀO</h2>
+        <p>Cắm board TX (ESP32 controller) qua USB rồi bấm <b>CONNECT USB</b>, hoặc bấm <b>DEMO MODE</b> để xem drone phản hồi với dữ liệu giả lập trong lúc chưa có phần cứng.<br>Đọc trực tiếp dòng debug gốc firmware in ra ở 115200 baud: <code>JOY1: throttle=.. yaw=..  JOY2: roll=.. pitch=..</code> — không cần sửa gì bên TX. Giữ throttle giữa + đẩy yaw hết cỡ ~0.5s để bắt <code>[CTRL] START</code> (arm).<br>Bấm <b>START</b> trên thanh công cụ để cho phép điều khiển drone; bấm <b>STOP</b> để ngắt điều khiển và tắt động cơ.<br>Bấm <b>VIEW</b> để chuyển góc nhìn thứ 3 (CHASE) / góc nhìn thứ nhất (FPV). Sân bay có cột chướng ngại vật (đỏ/cam) để luyện slalom, va vào sẽ bị đẩy lùi và ghi log.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="logpanel"><div id="loginner"></div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------
+  // CONFIG
+  // ---------------------------------------------------------------
+  const CENTER = 2048, RANGE = 2048; // 12-bit ADC style channel: 0..4095, mid 2048
+  const MAX_TILT_DEG = 32;
+  const MAX_YAW_RATE = 2.4; // rad/s at full stick
+  const CLIMB_RATE = 3.2;   // m/s at full throttle
+  const FWD_ACCEL = 9.0;
+
+  // ---- physics model ----
+  const MASS = 1.9;           // kg
+  const GRAVITY = 9.8;        // m/s^2
+  const WEIGHT_N = MASS * GRAVITY; // N, constant downward force
+  const THROTTLE_LIFT_THRESHOLD = 1400; // us — below this, no lift is generated
+  const THROTTLE_MAX_US = 2000;
+  const LIFT_MAX_N = WEIGHT_N * 1.9; // max lift at full throttle (enough headroom to climb)
+  const DRAG_LINEAR = 0.9;    // simple linear drag coefficient (per axis)
+  // external force (wind): a slowly-varying horizontal force in Newtons
+  const wind = {fx:0, fz:0, t: Math.random()*1000};
+  const WIND_MAX_N = 1.6;
+
+  function updateWind(dt){
+    wind.t += dt;
+    wind.fx = Math.sin(wind.t*0.17) * WIND_MAX_N * 0.6 + Math.sin(wind.t*0.41+1.3) * WIND_MAX_N * 0.4;
+    wind.fz = Math.cos(wind.t*0.13+0.7) * WIND_MAX_N * 0.6 + Math.cos(wind.t*0.37) * WIND_MAX_N * 0.4;
+  }
+
+  // ---------------------------------------------------------------
+  // THREE.JS SCENE
+  // ---------------------------------------------------------------
+  const wrap = document.getElementById('canvas-wrap');
+  const scene = new THREE.Scene();
+  const FOG_COLOR = 0x0a1410;
+  scene.fog = new THREE.FogExp2(FOG_COLOR, 0.0065);
+
+  const camera = new THREE.PerspectiveCamera(55, wrap.clientWidth/wrap.clientHeight, 0.1, 500);
+  const renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  renderer.setClearColor(FOG_COLOR);
+  wrap.appendChild(renderer.domElement);
+
+  // ---- sky dome: vertical gradient, kept in the phosphor/radar palette ----
+  function makeSkyTexture(){
+    const w=8,h=256;
+    const c = document.createElement('canvas'); c.width=w; c.height=h;
+    const ctx = c.getContext('2d');
+    const grad = ctx.createLinearGradient(0,0,0,h);
+    grad.addColorStop(0.0,'#050907');
+    grad.addColorStop(0.45,'#0a1712');
+    grad.addColorStop(0.75,'#123322');
+    grad.addColorStop(1.0,'#1c4a30');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,w,h);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace || tex.colorSpace;
+    return tex;
+  }
+  const skyGeo = new THREE.SphereGeometry(300, 24, 16);
+  const skyMat = new THREE.MeshBasicMaterial({map:makeSkyTexture(), side:THREE.BackSide, fog:false});
+  const sky = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(sky);
+
+  const hemi = new THREE.HemisphereLight(0x3a7a53, 0x0a1410, 1.0);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0x9fffc0, 0.75);
+  dir.position.set(20,34,12);
+  scene.add(dir);
+  const fillDir = new THREE.DirectionalLight(0x2f6b48, 0.25);
+  fillDir.position.set(-18,10,-14);
+  scene.add(fillDir);
+
+  // ---- field / ground: radar-style grid via canvas texture ----
+  function makeGroundTexture(){
+    const size = 1024;
+    const c = document.createElement('canvas'); c.width=c.height=size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#0a0f0c'; ctx.fillRect(0,0,size,size);
+    ctx.strokeStyle = 'rgba(109,255,160,0.14)'; ctx.lineWidth=1;
+    const step = size/32;
+    for(let i=0;i<=32;i++){
+      ctx.beginPath(); ctx.moveTo(i*step,0); ctx.lineTo(i*step,size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0,i*step); ctx.lineTo(size,i*step); ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(109,255,160,0.35)'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(size/2,0); ctx.lineTo(size/2,size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,size/2); ctx.lineTo(size,size/2); ctx.stroke();
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+  const groundMat = new THREE.MeshBasicMaterial({map:makeGroundTexture()});
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(400,400), groundMat);
+  ground.rotation.x = -Math.PI/2;
+  scene.add(ground);
+
+  // concentric radar rings
+  for(let r=10; r<=90; r+=20){
+    const ringGeo = new THREE.RingGeometry(r-0.08, r, 64);
+    const ringMat = new THREE.MeshBasicMaterial({color:0x6dffa0, transparent:true, opacity:0.10, side:THREE.DoubleSide});
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI/2; ring.position.y = 0.01;
+    scene.add(ring);
+  }
+
+  // ---- drone ----
+  const drone = new THREE.Group();
+  const phosphorMat = new THREE.MeshStandardMaterial({color:0x6dffa0, emissive:0x1c4a2f, roughness:0.4, metalness:0.3});
+  const darkMat = new THREE.MeshStandardMaterial({color:0x101a14, roughness:0.6});
+  const amberMat = new THREE.MeshStandardMaterial({color:0xffb454, emissive:0x552f00, roughness:0.4});
+
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.9,0.22,0.9), darkMat);
+  drone.add(body);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.08,12,12), amberMat);
+  beacon.position.y = 0.15;
+  drone.add(beacon);
+
+  function createPropeller(){
+    const group = new THREE.Group();
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07,0.08,0.07,10), darkMat);
+    group.add(hub);
+
+    const blades = [];
+    for(let i=0;i<3;i++){
+      const bladeMat = new THREE.MeshStandardMaterial({
+        color:0x6dffa0, emissive:0x1c4a2f, roughness:0.35, metalness:0.25,
+        transparent:true, opacity:1, side:THREE.DoubleSide
+      });
+      // tapered blade: wide at hub, narrow at tip, built as an extruded shape
+      const shape = new THREE.Shape();
+      shape.moveTo(0.06, -0.05);
+      shape.lineTo(0.06, 0.05);
+      shape.quadraticCurveTo(0.32, 0.07, 0.46, 0.02);
+      shape.quadraticCurveTo(0.5, 0, 0.46, -0.02);
+      shape.quadraticCurveTo(0.32, -0.07, 0.06, -0.05);
+      const bladeGeo = new THREE.ExtrudeGeometry(shape, {depth:0.012, bevelEnabled:false});
+      const blade = new THREE.Mesh(bladeGeo, bladeMat);
+      blade.rotation.x = -Math.PI/2;      // lay flat in the horizontal plane
+      blade.rotation.z = THREE.MathUtils.degToRad(8) * (i%2===0?1:-1); // slight pitch for realism
+      const pivot = new THREE.Group();
+      pivot.rotation.y = i * (Math.PI*2/3);
+      pivot.add(blade);
+      group.add(pivot);
+      blades.push(blade);
+    }
+
+    const discMat = new THREE.MeshBasicMaterial({
+      color:0x6dffa0, transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, side:THREE.DoubleSide, depthWrite:false
+    });
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.48, 32), discMat);
+    disc.rotation.x = -Math.PI/2;
+    group.add(disc);
+
+    return {group, blades, disc};
+  }
+
+  const armPositions = [[1,1],[1,-1],[-1,1],[-1,-1]];
+  const rotors = [];
+  armPositions.forEach(([sx,sz])=>{
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,1.3,8), darkMat);
+    arm.rotation.z = Math.PI/2;
+    arm.rotation.y = Math.atan2(sz,sx);
+    arm.position.set(sx*0.55, 0, sz*0.55);
+    drone.add(arm);
+
+    const prop = createPropeller();
+    prop.group.position.set(sx*1.05, 0.08, sz*1.05);
+    drone.add(prop.group);
+    rotors.push(prop);
+  });
+  drone.position.y = 2;
+  scene.add(drone);
+
+  // ---- obstacle course (poles for slalom / gate practice) ----
+  const obstacleData = [
+    {x:-18, z:12,  r:0.5, h:12},
+    {x:-18, z:-4,  r:0.5, h:8},   // paired with above -> narrow gate to fly through
+    {x:8,   z:22,  r:0.5, h:14},
+    {x:8,   z:8,   r:0.5, h:9},   // second gate pair
+    {x:22,  z:-15, r:0.5, h:11},
+    {x:-8,  z:-25, r:0.5, h:7},
+    {x:30,  z:5,   r:0.5, h:13},
+  ];
+  const poleMat = new THREE.MeshStandardMaterial({color:0xff5f56, emissive:0x4a0f0d, roughness:0.4, metalness:0.3});
+  const poleCapMat = new THREE.MeshStandardMaterial({color:0xffb454, emissive:0x552f00, roughness:0.4});
+  const obstacleGroup = new THREE.Group();
+  obstacleData.forEach(o=>{
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(o.r,o.r,o.h,12), poleMat);
+    pole.position.set(o.x, o.h/2, o.z);
+    obstacleGroup.add(pole);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(o.r*1.2,10,10), poleCapMat);
+    cap.position.set(o.x, o.h, o.z);
+    obstacleGroup.add(cap);
+    o.hitCooldown = 0;
+  });
+  scene.add(obstacleGroup);
+  let hitCount = 0;
+
+  function flashCollision(){
+    const m = el('main');
+    if(!m) return;
+    m.classList.remove('collision-flash');
+    void m.offsetWidth; // restart animation
+    m.classList.add('collision-flash');
+  }
+
+  function checkObstacleCollisions(dt){
+    obstacleData.forEach(o=>{
+      o.hitCooldown = Math.max(0, o.hitCooldown - dt);
+      const d = Math.hypot(kin.x-o.x, kin.z-o.z);
+      const collideR = o.r + 0.62; // pole radius + approx drone body radius
+      if(d < collideR && kin.y < o.h && kin.y > 0.08 && o.hitCooldown <= 0){
+        const nx = d > 0.001 ? (kin.x-o.x)/d : 1, nz = d > 0.001 ? (kin.z-o.z)/d : 0;
+        kin.x = o.x + nx*collideR;
+        kin.z = o.z + nz*collideR;
+        kin.vx *= -0.3; kin.vz *= -0.3;
+        hitCount++;
+        o.hitCooldown = 1.0;
+        el('valHits').textContent = String(hitCount);
+        logLine(`[!] COLLISION voi chuong ngai vat tai (${o.x.toFixed(0)}, ${o.z.toFixed(0)})`);
+        flashCollision();
+      }
+    });
+  }
+
+  // trajectory trail
+  const MAX_TRAIL = 200;
+  const trailPositions = new Float32Array(MAX_TRAIL*3);
+  const trailGeo = new THREE.BufferGeometry();
+  trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions,3));
+  const trailMat = new THREE.LineBasicMaterial({color:0x6dffa0, transparent:true, opacity:0.45});
+  const trailLine = new THREE.Line(trailGeo, trailMat);
+  scene.add(trailLine);
+  let trailIdx = 0, trailFilled = 0;
+  let trailTimer = 0;
+
+  // ---------------------------------------------------------------
+  // STATE
+  // ---------------------------------------------------------------
+  // thrN: 0..1 (0=1000us, 1=2000us). yawN/pitchN/rollN: -1..1 (matches RCCommand -1000..1000)
+  const raw = {thrN:0, yawN:0, pitchN:0, rollN:0, btn:0, armed:false};
+  const smooth = {thrN:0, yawN:0, pitchN:0, rollN:0};
+  const kin = {x:0, z:0, y:2, yawAngle:0, vx:0, vz:0, vy:0};
+  // visual-only smoothed pose (rendered), eased toward `kin` each frame for fluid animation
+  const visual = {x:0, z:0, y:2, yaw:0, roll:0, pitch:0};
+  let hoverBobT = 0;
+  function motorsHovering(){ return flightRunning && smooth.thrN > 0.42 && smooth.thrN < 0.62 && kin.y > 0.4; }
+
+  // Flight gating: drone only accepts control input and flies when running===true
+  let flightRunning = false;
+
+  // ---------------------------------------------------------------
+  // MISSIONS
+  // ---------------------------------------------------------------
+  // status: 'pending' | 'active' | 'done'
+  const missions = [
+    {
+      id:'takeoff', name:'Cất cánh', desc:'Bay lên độ cao ≥ 3.0 m', status:'pending',
+      targetAlt: 3.0,
+      check(){ if(kin.y >= this.targetAlt) this.status='done'; }
+    },
+    {
+      id:'waypoint', name:'Bay tới waypoint', desc:'Tới điểm (12, 0, -8), bán kính 2 m', status:'pending',
+      target:{x:12, z:-8}, radius:2,
+      check(){
+        const d = Math.hypot(kin.x-this.target.x, kin.z-this.target.z);
+        if(d <= this.radius) this.status='done';
+      }
+    },
+    {
+      id:'checkpoints', name:'Qua checkpoint theo thứ tự', desc:'CP1 → CP2 → CP3', status:'pending',
+      points:[{x:-15,z:10},{x:0,z:20},{x:15,z:10}], radius:3, nextIdx:0,
+      check(){
+        if(this.nextIdx >= this.points.length){ this.status='done'; return; }
+        const p = this.points[this.nextIdx];
+        const d = Math.hypot(kin.x-p.x, kin.z-p.z);
+        if(d <= this.radius){
+          this.nextIdx++;
+          if(this.nextIdx >= this.points.length) this.status='done';
+        }
+      }
+    },
+    {
+      id:'landing', name:'Hạ cánh đúng vị trí', desc:'Hạ xuống gần (0,0), độ cao ≤ 0.5 m', status:'pending',
+      target:{x:0, z:0}, radius:2.5, maxAlt:0.5,
+      check(){
+        const d = Math.hypot(kin.x-this.target.x, kin.z-this.target.z);
+        if(d <= this.radius && kin.y <= this.maxAlt) this.status='done';
+      }
+    }
+  ];
+  let activeMissionId = null; // mission currently marked 'active' (only one at a time, chosen by user)
+
+  function setMissionActive(id){
+    missions.forEach(m=>{ if(m.status==='active') m.status='pending'; });
+    const m = missions.find(mm=>mm.id===id);
+    if(m && m.status==='pending'){ m.status='active'; activeMissionId=id; }
+    else activeMissionId = null;
+    renderMissions();
+  }
+
+  function renderMissions(){
+    const list = el('missionList');
+    if(!list) return;
+    list.innerHTML = missions.map((m,i)=>{
+      const badgeText = m.status==='done' ? 'HOÀN THÀNH' : m.status==='active' ? 'ĐANG THỰC HIỆN' : 'CHƯA BẮT ĐẦU';
+      const badgeCls = m.status==='done' ? 'done' : m.status==='active' ? 'progress' : '';
+      const activeCls = m.status==='active' ? ' active' : '';
+      return `<div class="mission-item${activeCls}" data-id="${m.id}">
+        <div class="mission-idx">${i+1}</div>
+        <div class="mission-info">
+          <div class="mission-name">${m.name}</div>
+          <div class="mission-desc">${m.desc}</div>
+        </div>
+        <div class="mission-badge ${badgeCls}">${badgeText}</div>
+      </div>`;
+    }).join('');
+    const doneCount = missions.filter(m=>m.status==='done').length;
+    el('missionStatus').textContent = `${doneCount}/${missions.length} XONG`;
+    Array.from(list.querySelectorAll('.mission-item')).forEach(node=>{
+      node.addEventListener('click', ()=>{
+        const id = node.getAttribute('data-id');
+        const m = missions.find(mm=>mm.id===id);
+        if(m && m.status!=='done') setMissionActive(id);
+      });
+    });
+  }
+
+  function updateMissions(){
+    if(!flightRunning) return;
+    const m = missions.find(mm=>mm.id===activeMissionId);
+    if(m && m.status==='active'){
+      m.check();
+      if(m.status==='done') renderMissions();
+    }
+  }
+
+  let connected = false, demo = false, port = null, reader = null, writer = null, keepReading = false;
+  let lineBuf = "";
+  let packetCount = 0, lastRateCalc = performance.now(), currentRate = 0;
+  let demoTimer = null, demoT = 0;
+
+  const el = id => document.getElementById(id);
+  const statusLed = el('statusLed'), statusText = el('statusText');
+  const centerEmpty = el('center-empty');
+
+  function setStatus(mode){
+    statusLed.className = 'led';
+    if(mode==='connected'){ statusLed.classList.add('on'); statusText.textContent='CONNECTED · LIVE USB'; centerEmpty.style.display='none'; }
+    else if(mode==='demo'){ statusLed.classList.add('demo'); statusText.textContent='DEMO MODE · SIMULATED'; centerEmpty.style.display='none'; }
+    else { statusText.textContent='DISCONNECTED'; centerEmpty.style.display='flex'; }
+  }
+  setStatus('idle');
+  renderMissions();
+
+  function pctThr(n){ return Math.max(0,Math.min(100, n*100)); }
+  function pctBi(n){ return Math.max(0,Math.min(100, (n+1)/2*100)); }
+  function clamp01(v){ return Math.max(0,Math.min(1,v)); }
+  function clamp11(v){ return Math.max(-1,Math.min(1,v)); }
+
+  // Matches: "JOY1: throttle=1500 yaw=20  JOY2: roll=5 pitch=-12" (printed by main_esp32_controler.cpp every 200ms)
+  const JOY_LOG_RE = /JOY1:\s*throttle=(-?\d+)\s+yaw=(-?\d+)\s+JOY2:\s*roll=(-?\d+)\s+pitch=(-?\d+)/;
+
+  function applyLine(line){
+    const m = JOY_LOG_RE.exec(line);
+    if(m){
+      packetCount++; // rate counter reflects incoming data regardless of run state
+      if(!flightRunning){
+        // Ignored while stopped: drone must not receive throttle/control until START is pressed.
+        return true;
+      }
+      const throttle = parseInt(m[1],10); // 1000..2000
+      const yaw = parseInt(m[2],10);      // -1000..1000
+      const roll = parseInt(m[3],10);     // -1000..1000
+      const pitch = parseInt(m[4],10);    // -1000..1000
+      raw.thrN = clamp01((throttle - 1000) / 1000);
+      raw.yawN = clamp11(-yaw / 1000);
+      raw.pitchN = clamp11(-pitch / 1000); // dao dau: khop chieu pitch that cua drone
+      raw.rollN = clamp11(-roll / 1000);   // dao dau: khop chieu roll that cua drone
+      return true;
+    }
+    if(line.indexOf('[CTRL] START') === 0){ if(flightRunning) raw.armed = true; return true; }
+    if(line.indexOf('[CTRL] END') === 0){ raw.armed = false; return true; }
+    if(line.indexOf('[CTRL]') === 0 || line.indexOf('[CAL]') === 0 || line.indexOf('[ESP_NOW') === 0){
+      return true; // recognized firmware log line, just nothing to plot
+    }
+    // Legacy/demo fallback: CSV "THR,YAW,PITCH,ROLL,BTN" or "X,Y,BTN" in 0..4095 ADC style
+    const fields = line.split(',').map(s=>parseInt(s.trim(),10)).filter(n=>!isNaN(n));
+    if(fields.length >= 5){
+      packetCount++;
+      if(!flightRunning) return true;
+      raw.thrN = clamp01((fields[0]-CENTER+RANGE)/(2*RANGE));
+      raw.yawN = clamp11(-(fields[1]-CENTER)/RANGE);
+      raw.pitchN = clamp11(-(fields[2]-CENTER)/RANGE); // dao dau: khop chieu pitch that cua drone
+      raw.rollN = clamp11(-(fields[3]-CENTER)/RANGE);  // dao dau: khop chieu roll that cua drone
+      raw.btn = fields[4];
+      return true;
+    } else if(fields.length === 3){
+      packetCount++;
+      if(!flightRunning) return true;
+      raw.rollN = clamp11(-(fields[0]-CENTER)/RANGE);  // dao dau: khop chieu roll that cua drone
+      raw.pitchN = clamp11(-(fields[1]-CENTER)/RANGE); // dao dau: khop chieu pitch that cua drone
+      raw.btn = fields[2];
+      return true;
+    }
+    return false;
+  }
+
+  function logLine(text){
+    const box = el('loginner');
+    const div = document.createElement('div');
+    div.textContent = text;
+    box.appendChild(div);
+    while(box.children.length > 60) box.removeChild(box.firstChild);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ---------------------------------------------------------------
+  // WEB SERIAL
+  // ---------------------------------------------------------------
+  async function connectSerial(){
+    if(!('serial' in navigator)){
+      logLine('[ERR] navigator.serial không tồn tại. Cần Chrome/Edge desktop và trang phải chạy ở top-level (không bị iframe chặn permissions-policy). Nếu đang xem trong Claude, thử tải file .html về và mở trực tiếp bằng Chrome.');
+      alert('Web Serial API không khả dụng ở đây (thường do trình duyệt không hỗ trợ hoặc trang đang chạy trong iframe bị chặn quyền). Hãy tải file .html này về máy và mở trực tiếp bằng Chrome/Edge, hoặc dùng DEMO MODE.');
+      return;
+    }
+    try{
+      port = await navigator.serial.requestPort();
+      await port.open({baudRate:115200});
+      stopDemo();
+      connected = true; keepReading = true;
+      setStatus('connected');
+      el('btnConnect').textContent = 'DISCONNECT';
+      try{ writer = port.writable.getWriter(); }
+      catch(e){ writer = null; logLine('[!] Không mở được writer để gửi $SIMTEL: '+e.message); }
+      readLoop();
+      port.addEventListener && port.addEventListener('disconnect', onDisconnect);
+    }catch(e){
+      logLine('[ERR] '+e.message);
+    }
+  }
+
+  async function readLoop(){
+    const decoder = new TextDecoderStream();
+    const readableClosed = port.readable.pipeTo(decoder.writable);
+    reader = decoder.readable.getReader();
+    try{
+      while(keepReading){
+        const {value, done} = await reader.read();
+        if(done) break;
+        if(value){
+          lineBuf += value;
+          let idx;
+          while((idx = lineBuf.indexOf('\n')) >= 0){
+            const line = lineBuf.slice(0, idx).trim();
+            lineBuf = lineBuf.slice(idx+1);
+            if(line.length){
+              const matched = applyLine(line);
+              logLine((matched ? '> ' : '[?] ')+line);
+            }
+          }
+        }
+      }
+    }catch(e){
+      logLine('[ERR] read loop: '+e.message);
+    }finally{
+      reader.releaseLock();
+    }
+  }
+
+  async function disconnectSerial(){
+    keepReading = false;
+    connected = false;
+    try{ if(reader) await reader.cancel(); }catch(e){}
+    try{ if(writer){ await writer.close(); } }catch(e){}
+    writer = null;
+    try{ if(port) await port.close(); }catch(e){}
+    port = null;
+    el('btnConnect').textContent = 'CONNECT USB';
+    setStatus('idle');
+  }
+  function onDisconnect(){ disconnectSerial(); logLine('[!] Thiết bị bị rút.'); }
+
+  // ---------------------------------------------------------------
+  // Gửi telemetry giả lập NGƯỢC về board tay cầm qua USB Serial, để
+  // board feed thẳng vào gTelemetry (giống như nhận qua ESP-NOW) và
+  // vẽ lên TFT — dùng để bench-test màn hình khi chưa có drone thật.
+  // Định dạng: $SIMTEL,roll,pitch,yaw,m1,m2,m3,m4,armed,alt,spd\n
+  // (roll/pitch/yaw độ thực; m1..m4 us 1000-2000; alt m; spd m/s)
+  // ---------------------------------------------------------------
+  const simTelEncoder = new TextEncoder();
+  let lastSimTelMs = 0;
+  async function sendSimTelemetry(rollDeg, pitchDeg, yawDeg, throttleUsVal, armedFlag, altM, spdMs){
+    if(!connected || !writer) return;
+    const now = performance.now();
+    if(now - lastSimTelMs < 100) return; // ~10Hz, khớp nhịp Display_Update() ben firmware
+    lastSimTelMs = now;
+    const m = Math.round(throttleUsVal); // sim khong co mix rieng tung dong co, dung chung 1 gia tri ca 4
+    const line = `$SIMTEL,${rollDeg.toFixed(1)},${pitchDeg.toFixed(1)},${yawDeg.toFixed(1)},`+
+                 `${m},${m},${m},${m},${armedFlag?1:0},${altM.toFixed(1)},${spdMs.toFixed(1)}\n`;
+    try{ await writer.write(simTelEncoder.encode(line)); }
+    catch(e){ logLine('[!] Gửi $SIMTEL lỗi: '+e.message); }
+  }
+
+  el('btnConnect').addEventListener('click', ()=>{
+    if(connected) disconnectSerial(); else connectSerial();
+  });
+
+  // ---------------------------------------------------------------
+  // DEMO MODE
+  // ---------------------------------------------------------------
+  function startDemo(){
+    if(connected) disconnectSerial();
+    demo = true; setStatus('demo');
+    el('btnDemo').textContent = 'STOP DEMO';
+    demoTimer = setInterval(()=>{
+      demoT += 0.05;
+      const throttle = Math.round(1500 + 480*Math.sin(demoT*0.4));      // 1000..2000
+      const yaw = Math.round(300*Math.sin(demoT*0.15));                  // -1000..1000
+      const pitch = Math.round(650*Math.sin(demoT*0.6));
+      const roll = Math.round(650*Math.cos(demoT*0.5));
+      const line = `JOY1: throttle=${throttle} yaw=${yaw}  JOY2: roll=${roll} pitch=${pitch}`;
+      applyLine(line);
+      logLine('~ '+line);
+      if(Math.floor(demoT) % 6 === 0 && Math.floor(demoT*10)%10===0){
+        applyLine(raw.armed ? '[CTRL] END' : '[CTRL] START');
+      }
+    }, 40);
+  }
+  function stopDemo(){
+    demo = false;
+    clearInterval(demoTimer);
+    el('btnDemo').textContent = 'DEMO MODE';
+    if(!connected) setStatus('idle');
+  }
+  el('btnDemo').addEventListener('click', ()=>{ demo ? stopDemo() : startDemo(); });
+
+  // ---------------------------------------------------------------
+  // START / STOP FLIGHT CONTROL
+  // ---------------------------------------------------------------
+  function setFlightRunning(run){
+    flightRunning = run;
+    el('btnStart').disabled = run;
+    el('btnStop').disabled = !run;
+    const stateEl = el('flightState');
+    stateEl.textContent = run ? 'RUNNING' : 'STOPPED';
+    stateEl.className = 'flight-state' + (run ? ' running' : '');
+    if(!run){
+      // motors stop, no more control input accepted; craft decelerates per existing physics
+      raw.thrN = 0; raw.yawN = 0; raw.pitchN = 0; raw.rollN = 0; raw.armed = false;
+    }
+  }
+  el('btnStart').addEventListener('click', ()=> setFlightRunning(true));
+  el('btnStop').addEventListener('click', ()=> setFlightRunning(false));
+  setFlightRunning(false);
+
+  // ---------------------------------------------------------------
+  // LOG PANEL TOGGLE
+  // ---------------------------------------------------------------
+  el('btnLog').addEventListener('click', ()=>{
+    el('logpanel').classList.toggle('open');
+  });
+
+  // ---------------------------------------------------------------
+  // VIEW MODE: CHASE (3rd person) / FPV (1st person, nose cam)
+  // ---------------------------------------------------------------
+  let viewMode = 'chase';
+  el('btnView').addEventListener('click', ()=>{
+    viewMode = viewMode === 'chase' ? 'fpv' : 'chase';
+    el('btnView').textContent = 'VIEW: ' + (viewMode === 'chase' ? 'CHASE' : 'FPV');
+    el('fpvOverlay').classList.toggle('show', viewMode === 'fpv');
+  });
+
+  // ---------------------------------------------------------------
+  // RESIZE / RADAR / CAMERA
+  // ---------------------------------------------------------------
+  function onResize(){
+    camera.aspect = wrap.clientWidth/wrap.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+  }
+  window.addEventListener('resize', onResize);
+
+  // ---------------------------------------------------------------
+  // Compact heading readout (no canvas widget — full attitude/compass
+  // instrument now lives on the physical handheld's TFT, see display.cpp)
+  // ---------------------------------------------------------------
+  function updateHeadingReadout(){
+    const headingDeg = ((THREE.MathUtils.radToDeg(visual.yaw)%360)+360)%360;
+    el('valHdg').textContent = String(Math.round(headingDeg)).padStart(3,'0');
+  }
+
+  const radarCtx = document.getElementById('radar').getContext('2d');
+  function drawRadar(){
+    const c = radarCtx, W=132,H=132,cx=W/2,cy=H/2;
+    c.clearRect(0,0,W,H);
+    c.strokeStyle='rgba(109,255,160,0.25)'; c.lineWidth=1;
+    for(let r=18;r<=60;r+=18){ c.beginPath(); c.arc(cx,cy,r,0,Math.PI*2); c.stroke(); }
+    c.beginPath(); c.moveTo(cx,4); c.lineTo(cx,H-4); c.stroke();
+    c.beginPath(); c.moveTo(4,cy); c.lineTo(W-4,cy); c.stroke();
+    const scale = 3.2;
+    const px = cx + kin.x*scale, pz = cy + kin.z*scale;
+    c.fillStyle = '#6dffa0';
+    c.beginPath(); c.arc(px,pz,3.5,0,Math.PI*2); c.fill();
+    c.strokeStyle='#ffb454'; c.lineWidth=1.5;
+    c.beginPath();
+    c.moveTo(px,pz);
+    c.lineTo(px + Math.sin(kin.yawAngle)*10, pz + Math.cos(kin.yawAngle)*10);
+    c.stroke();
+  }
+
+  // ---------------------------------------------------------------
+  // MAIN LOOP
+  // ---------------------------------------------------------------
+  let lastT = performance.now();
+  function animate(){
+    requestAnimationFrame(animate);
+    const now = performance.now();
+    const dt = Math.min((now-lastT)/1000, 0.05);
+    lastT = now;
+
+    const L = 0.18;
+    smooth.thrN   += (raw.thrN   - smooth.thrN)   * L;
+    smooth.yawN   += (raw.yawN   - smooth.yawN)   * L;
+    smooth.pitchN += (raw.pitchN - smooth.pitchN) * L;
+    smooth.rollN  += (raw.rollN  - smooth.rollN)  * L;
+
+    const nThr = smooth.thrN;      // 0..1 (1000..2000us)
+    const nYaw = smooth.yawN;      // -1..1
+    const nPitch = smooth.pitchN;  // -1..1
+    const nRoll = smooth.rollN;    // -1..1
+
+    const rollAngle = THREE.MathUtils.degToRad(nRoll * MAX_TILT_DEG);
+    const pitchAngle = THREE.MathUtils.degToRad(-nPitch * MAX_TILT_DEG);
+
+    kin.yawAngle += nYaw * MAX_YAW_RATE * dt;
+
+    updateWind(dt);
+
+    // ---- force model ----
+    // Throttle channel in microseconds (matches firmware convention: 1000..2000)
+    const throttleUs = 1000 + nThr*1000;
+    // Lift only builds once throttle exceeds the mechanical threshold; scales with
+    // how far past the threshold the stick is, up to full throttle.
+    let liftN = 0;
+    if(flightRunning && throttleUs > THROTTLE_LIFT_THRESHOLD){
+      const liftFrac = (throttleUs - THROTTLE_LIFT_THRESHOLD) / (THROTTLE_MAX_US - THROTTLE_LIFT_THRESHOLD);
+      liftN = clamp01(liftFrac) * LIFT_MAX_N;
+    }
+    const gravityN = WEIGHT_N; // F_gravity = m * g, always present
+
+    // External force (wind) only meaningfully pushes the craft while it's airborne/flying;
+    // grounded + stopped craft doesn't get blown around.
+    const externalFx = (flightRunning || kin.y > 0.35) ? wind.fx : 0;
+    const externalFz = (flightRunning || kin.y > 0.35) ? wind.fz : 0;
+
+    // Net vertical force -> vertical acceleration (F = m*a)
+    const netVerticalN = liftN - gravityN;
+    const ay = netVerticalN / MASS;
+    kin.vy += ay*dt;
+    kin.vy -= kin.vy*DRAG_LINEAR*dt; // air resistance on vertical motion
+    kin.y += kin.vy*dt;
+    if(kin.y <= 0){ kin.y = 0; kin.vy = 0; } // ground contact: craft can't fall through the floor
+    kin.y = Math.min(kin.y, 60);
+
+    // Horizontal force: attitude-driven thrust component (only while running) + wind
+    const forward = flightRunning ? -nPitch * FWD_ACCEL * MASS : 0; // treat as N via mass-scaled accel for continuity with existing tuning
+    const lateral = flightRunning ? nRoll * FWD_ACCEL * MASS : 0;
+    const thrustFx = Math.sin(kin.yawAngle)*forward + Math.cos(kin.yawAngle)*lateral;
+    const thrustFz = Math.cos(kin.yawAngle)*forward - Math.sin(kin.yawAngle)*lateral;
+
+    const netFx = thrustFx + externalFx;
+    const netFz = thrustFz + externalFz;
+    const ax = netFx / MASS;
+    const az = netFz / MASS;
+
+    kin.vx += ax*dt;
+    kin.vz += az*dt;
+    kin.vx -= kin.vx*DRAG_LINEAR*dt;
+    kin.vz -= kin.vz*DRAG_LINEAR*dt;
+    if(kin.y <= 0.001){ kin.vx *= 0.9; kin.vz *= 0.9; } // ground friction once landed
+    kin.x += kin.vx*dt;
+    kin.z += kin.vz*dt;
+    kin.x = Math.max(-95, Math.min(95, kin.x));
+    kin.z = Math.max(-95, Math.min(95, kin.z));
+
+    checkObstacleCollisions(dt);
+
+    // Visual smoothing layer: eases the rendered pose toward the physics state so
+    // frame-to-frame force changes (wind gusts, throttle steps) don't read as jitter.
+    hoverBobT += dt;
+    const hoverBob = motorsHovering() ? Math.sin(hoverBobT*2.6)*0.03 : 0;
+    visual.x += (kin.x - visual.x) * Math.min(1, dt*14);
+    visual.y += ((kin.y + hoverBob) - visual.y) * Math.min(1, dt*14);
+    visual.z += (kin.z - visual.z) * Math.min(1, dt*14);
+    visual.yaw += (kin.yawAngle - visual.yaw) * Math.min(1, dt*10);
+    visual.roll += (rollAngle - visual.roll) * Math.min(1, dt*9);
+    visual.pitch += (pitchAngle - visual.pitch) * Math.min(1, dt*9);
+
+    drone.position.set(visual.x, visual.y, visual.z);
+    drone.rotation.set(0,0,0);
+    drone.rotation.y = visual.yaw;
+    drone.rotateZ(-visual.roll);
+    drone.rotateX(visual.pitch);
+
+    const motorsOn = flightRunning && nThr > 0.02;
+    const spinSpeed = motorsOn ? (6 + Math.max(0,nThr)*40) : 0;
+    const spinNorm = motorsOn ? clamp01(nThr) : 0;            // 0..1, matches throttle
+    const blurAmt = clamp01((spinNorm - 0.2) / 0.6);          // starts blurring past ~20% throttle, fully blurred by ~80%
+    rotors.forEach((r,i)=>{
+      r.group.rotation.y += spinSpeed*dt*(i%2===0?1:-1);
+      r.blades.forEach(b => { b.material.opacity = 1 - blurAmt*0.9; });
+      r.disc.material.opacity = blurAmt*0.5;
+    });
+
+    trailTimer += dt;
+    if(trailTimer > 0.06){
+      trailTimer = 0;
+      trailPositions[trailIdx*3] = kin.x;
+      trailPositions[trailIdx*3+1] = kin.y;
+      trailPositions[trailIdx*3+2] = kin.z;
+      trailIdx = (trailIdx+1) % MAX_TRAIL;
+      trailFilled = Math.min(trailFilled+1, MAX_TRAIL);
+      trailGeo.setDrawRange(0, trailFilled);
+      trailGeo.attributes.position.needsUpdate = true;
+    }
+
+    if(viewMode === 'fpv'){
+      const noseOffset = 0.55;
+      camera.position.set(
+        visual.x + Math.sin(visual.yaw)*noseOffset,
+        visual.y + 0.06,
+        visual.z + Math.cos(visual.yaw)*noseOffset
+      );
+      const lookDist = 8;
+      const lx = camera.position.x + Math.sin(visual.yaw)*lookDist;
+      const ly = camera.position.y - Math.sin(visual.pitch)*lookDist*0.6;
+      const lz = camera.position.z + Math.cos(visual.yaw)*lookDist;
+      camera.up.set(Math.sin(visual.roll), Math.cos(visual.roll), 0);
+      camera.lookAt(lx, ly, lz);
+    } else {
+      const camDist = 6.5, camHeight = 3.2;
+      const desiredCamX = visual.x - Math.sin(visual.yaw)*camDist;
+      const desiredCamZ = visual.z - Math.cos(visual.yaw)*camDist;
+      camera.position.x += (desiredCamX - camera.position.x)*0.06;
+      camera.position.z += (desiredCamZ - camera.position.z)*0.06;
+      camera.position.y += (visual.y+camHeight - camera.position.y)*0.06;
+      camera.up.set(0,1,0);
+      camera.lookAt(drone.position.x, drone.position.y, drone.position.z);
+    }
+
+    el('valThr').textContent = String(Math.round(1000 + smooth.thrN*1000));
+    el('valYaw').textContent = String(Math.round(smooth.yawN*1000));
+    el('valPitch').textContent = String(Math.round(smooth.pitchN*1000));
+    el('valRoll').textContent = String(Math.round(smooth.rollN*1000));
+    el('barThr').style.width = pctThr(smooth.thrN)+'%';
+    el('barYaw').style.width = pctBi(smooth.yawN)+'%';
+    el('barPitch').style.width = pctBi(smooth.pitchN)+'%';
+    el('barRoll').style.width = pctBi(smooth.rollN)+'%';
+
+    el('valAlt').textContent = kin.y.toFixed(1);
+    const speed = Math.hypot(kin.vx, kin.vz, kin.vy);
+    el('valSpeed').textContent = speed.toFixed(1);
+    const liftNow = (flightRunning && (1000+smooth.thrN*1000) > THROTTLE_LIFT_THRESHOLD)
+      ? clamp01(((1000+smooth.thrN*1000) - THROTTLE_LIFT_THRESHOLD)/(THROTTLE_MAX_US-THROTTLE_LIFT_THRESHOLD)) * LIFT_MAX_N
+      : 0;
+    el('valLift').textContent = liftNow.toFixed(1);
+    el('valWeight').textContent = WEIGHT_N.toFixed(1);
+    const gForce = (ay + GRAVITY) / GRAVITY; // felt vertical g: 1.0g at hover, <1 falling, >1 climbing hard
+    el('valG').textContent = gForce.toFixed(2)+'g';
+    updateHeadingReadout();
+
+    sendSimTelemetry(
+      THREE.MathUtils.radToDeg(visual.roll),
+      THREE.MathUtils.radToDeg(visual.pitch),
+      ((THREE.MathUtils.radToDeg(visual.yaw)%360)+360)%360,
+      1000 + smooth.thrN*1000,
+      flightRunning,
+      kin.y,
+      speed
+    );
+
+    updateMissions();
+
+    const armedEl = el('armedText');
+    if(armedEl){
+      armedEl.textContent = raw.armed ? 'ARMED' : 'DISARMED';
+      armedEl.style.color = raw.armed ? 'var(--danger)' : 'var(--text-dim)';
+    }
+
+    const flags = [];
+    for(let b=0;b<4;b++){
+      flags.push(`<div class="flag${(raw.btn>>b)&1 ? ' active':''}">B${b}</div>`);
+    }
+    el('btnbar').innerHTML = flags.join('');
+
+    drawRadar();
+
+    if(now - lastRateCalc > 500){
+      currentRate = Math.round(packetCount / ((now-lastRateCalc)/1000));
+      packetCount = 0; lastRateCalc = now;
+      el('rateDisplay').textContent = (connected||demo) ? currentRate+' Hz' : '-- Hz';
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+</script>
+</body>
+</html>
