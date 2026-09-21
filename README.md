@@ -1,3 +1,9 @@
+<div align="center">
+
+<img src="docs/banner.svg" alt="GCS-STATION by RESHAPE LAB: ground station that runs in the browser" width="100%">
+
+</div>
+
 # GCS-STATION
 
 Trạm mặt đất chạy trên trình duyệt.
