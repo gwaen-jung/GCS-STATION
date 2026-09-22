@@ -341,13 +341,23 @@
   const drone = new THREE.Group();
   const phosphorMat = new THREE.MeshStandardMaterial({color:0x6dffa0, emissive:0x1c4a2f, roughness:0.4, metalness:0.3});
   const darkMat = new THREE.MeshStandardMaterial({color:0x101a14, roughness:0.6});
+  // lighter than darkMat: the real frame is a much bigger surface than the old box+arms it replaced,
+  // so painting it near-black made the whole drone hard to see against the dark scene.
+  const frameMat = new THREE.MeshStandardMaterial({color:0x3d5a48, emissive:0x0f2318, roughness:0.55, metalness:0.25});
   const amberMat = new THREE.MeshStandardMaterial({color:0xffb454, emissive:0x552f00, roughness:0.4});
 
   const frameGeo = loadPackedMesh(DRONE_FRAME_B64);
-  const body = new THREE.Mesh(frameGeo, darkMat);
+  // The real mesh's own vertical center of mass sits well below its motor plane (long landing-gear
+  // legs), which made the drone look like it was hanging/sitting low. Re-center on the mesh's own
+  // bounding box instead of trusting the motor-plane origin baked in at export time, and reuse the
+  // same shift for the propellers/beacon below so they stay attached in the right place.
+  frameGeo.computeBoundingBox();
+  const frameYOffset = -(frameGeo.boundingBox.min.y + frameGeo.boundingBox.max.y) / 2;
+  frameGeo.translate(0, frameYOffset, 0);
+  const body = new THREE.Mesh(frameGeo, frameMat);
   drone.add(body);
   const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.08,12,12), amberMat);
-  beacon.position.y = 0.15;
+  beacon.position.y = 0.15 + frameYOffset;
   drone.add(beacon);
 
   function createPropeller(){
@@ -395,7 +405,7 @@
   armPositions.forEach(([sx,sz])=>{
     // arms are part of the real frame mesh now, only the (still procedural, spinning) propeller is added per corner
     const prop = createPropeller();
-    prop.group.position.set(sx*1.05, 0.08, sz*1.05);
+    prop.group.position.set(sx*1.05, 0.08 + frameYOffset, sz*1.05);
     drone.add(prop.group);
     rotors.push(prop);
   });
@@ -765,7 +775,11 @@
     const dt = Math.min((now-lastT)/1000, 0.05);
     lastT = now;
 
-    const L = 0.18;
+    // Frame-rate independent smoothing: a flat per-frame factor (the old `const L = 0.18`) converges
+    // slower in real time whenever the frame rate drops, which reads as laggy/jerky controls on a
+    // slower machine. This reaches the same 0.18-per-frame feel at 60fps but holds steady at other
+    // frame rates too.
+    const L = 1 - Math.pow(1 - 0.18, dt*60);
     smooth.thrN   += (raw.thrN   - smooth.thrN)   * L;
     smooth.yawN   += (raw.yawN   - smooth.yawN)   * L;
     smooth.pitchN += (raw.pitchN - smooth.pitchN) * L;
@@ -888,9 +902,10 @@
       const camDist = 6.5, camHeight = 3.2;
       const desiredCamX = visual.x - Math.sin(visual.yaw)*camDist;
       const desiredCamZ = visual.z - Math.cos(visual.yaw)*camDist;
-      camera.position.x += (desiredCamX - camera.position.x)*0.06;
-      camera.position.z += (desiredCamZ - camera.position.z)*0.06;
-      camera.position.y += (visual.y+camHeight - camera.position.y)*0.06;
+      const camL = 1 - Math.pow(1 - 0.06, dt*60); // same frame-rate-independent fix as the input smoothing above
+      camera.position.x += (desiredCamX - camera.position.x)*camL;
+      camera.position.z += (desiredCamZ - camera.position.z)*camL;
+      camera.position.y += (visual.y+camHeight - camera.position.y)*camL;
       camera.up.set(0,1,0);
       camera.lookAt(drone.position.x, drone.position.y, drone.position.z);
     }
